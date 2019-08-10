@@ -1,0 +1,7 @@
+http:http://peksvn04-rd:6801/svn/ITPL_N9000_SVN/V300R006C20/code/branches/br_9000_V300R006C20_OS_ISO
+114283
+
+compiletime=2018-09-19-00-59-43
+version=EulerOS_V200R003C00SPC616B120_STORAGE_X86
+OS_compiletime=2018-10-19
+OS_compileversion=V300R006C20

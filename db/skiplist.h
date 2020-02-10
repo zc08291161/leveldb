@@ -263,6 +263,10 @@ typename SkipList<Key,Comparator>::Node* SkipList<Key,Comparator>::FindGreaterOr
     const {
   Node* x = head_;
   int level = GetMaxHeight() - 1;
+  /* ZcNote::这个函数用一个循环做了两个循环该做的事情:
+             1、遍历每一层的链表，知道找到最后一个小于于自己的Node，记录下来
+             2、遍历所有层
+             因此，这个函数填充了prev，同时返回了第0层最后一个key值小于传入key的Node*/
   while (true) {
     Node* next = x->Next(level);
     if (KeyIsAfterNode(key, next)) {
@@ -338,6 +342,7 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
   // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
   // here since Insert() is externally synchronized.
   Node* prev[kMaxHeight];
+  /* ZcNote:: 这个函数能够将所有层级的上一个比key小的node的指针保留下来 */
   Node* x = FindGreaterOrEqual(key, prev);
 
   // Our data structure does not allow duplicate insertion
@@ -364,6 +369,10 @@ void SkipList<Key,Comparator>::Insert(const Key& key) {
   for (int i = 0; i < height; i++) {
     // NoBarrier_SetNext() suffices since we will add a barrier when
     // we publish a pointer to "x" in prev[i].
+    /* ZcNote:: 为何第一句不用原子，下面一句用? 因为双向链表，pre的next没指向
+	            就相当于Node还没有挂上去，相当于写操作就没有完成，这会去读，也读不到
+	            又因为，所有的写操作转换到leveldb引擎中都变为了单线程，因此不需要对
+	            写进行互斥,也就是说不存在两个线程同时做insert */
     x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
     prev[i]->SetNext(i, x);
   }

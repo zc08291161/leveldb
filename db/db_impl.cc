@@ -1044,7 +1044,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       "compacted to: %s", versions_->LevelSummary(&tmp));
   return status;
 }
-
+#if 0
 namespace {
 struct IterState {
   port::Mutex* mu;
@@ -1063,7 +1063,7 @@ static void CleanupIteratorState(void* arg1, void* arg2) {
   delete state;
 }
 }  // namespace
-
+#endif
 Iterator* DBImpl::NewInternalIterator(const ReadOptions& options,
                                       SequenceNumber* latest_snapshot,
                                       uint32_t* seed) {
@@ -1199,6 +1199,9 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* my_batch) {
 
   MutexLock l(&mutex_);
   writers_.push_back(&w);
+  /* ZcNote:: 1、如果队列没有做完，且自己不是队列的第一个元素，那么加入队列之后
+           就等待批量做完，如果是第一个元素，则向下走
+              2、这个wait是局部变量的wait，因此一定是局部变量亲自signal */
   while (!w.done && &w != writers_.front()) {
     w.cv.Wait();
   }
@@ -1325,7 +1328,9 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // Yield previous error
       s = bg_error_;
       break;
-    } else if (
+    } 
+	  /* ZcNote:: 如果满足version第一层的数量较大，则延时1毫秒再执行*/
+	  else if (
         allow_delay &&
         versions_->NumLevelFiles(0) >= config::kL0_SlowdownWritesTrigger) {
       // We are getting close to hitting a hard limit on the number of

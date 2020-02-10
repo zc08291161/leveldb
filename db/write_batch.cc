@@ -112,7 +112,7 @@ void WriteBatch::Delete(const Slice& key) {
   PutLengthPrefixedSlice(&rep_, key);
 }
 
-namespace {
+
 class MemTableInserter : public WriteBatch::Handler {
  public:
   SequenceNumber sequence_;
@@ -127,7 +127,7 @@ class MemTableInserter : public WriteBatch::Handler {
     sequence_++;
   }
 };
-}  // namespace
+
 
 Status WriteBatchInternal::InsertInto(const WriteBatch* b,
                                       MemTable* memtable) {

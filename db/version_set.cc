@@ -251,6 +251,7 @@ void Version::AddIterators(const ReadOptions& options,
 }
 
 // Callback from TableCache::Get()
+#if 0
 namespace {
 enum SaverState {
   kNotFound,
@@ -265,6 +266,7 @@ struct Saver {
   std::string* value;
 };
 }
+#endif
 static void SaveValue(void* arg, const Slice& ikey, const Slice& v) {
   Saver* s = reinterpret_cast<Saver*>(arg);
   ParsedInternalKey parsed_key;

@@ -650,7 +650,12 @@ void DBImpl::MaybeScheduleCompaction() {
     // DB is being deleted; no more background compactions
   } else if (!bg_error_.ok()) {
     // Already got an error; no more changes
-  } else if (imm_ == NULL &&
+  } 
+	/*ZcNote:: imm_== NULL说明暂时没有写入操作，也就没有makeroomforWrite
+	说明这条分支没有compaction需求；version_->needsCompaction不需要说明
+	get方面没有从version中获取之后file的相应次数下降为0的；实际上只有这两部分
+	会引发compaction*/
+	else if (imm_ == NULL &&
              manual_compaction_ == NULL &&
              !versions_->NeedsCompaction()) {
     // No work to be done
@@ -699,7 +704,8 @@ void DBImpl::BackgroundCompaction() {
     c = versions_->CompactRange(m->level, m->begin, m->end);
     m->done = (c == NULL);
     if (c != NULL) {
-      manual_end = c->input(0, c->num_input_files(0) - 1)->largest;
+	  /* ZcNote::这个是所有压缩输入的ssttable文件中最后那个文件的最大的key*/
+	  manual_end = c->input(0, c->num_input_files(0) - 1)->largest;
     }
     Log(options_.info_log,
         "Manual compaction at level-%d from %s .. %s; will stop at %s\n",

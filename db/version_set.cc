@@ -160,6 +160,11 @@ bool SomeFileOverlapsRange(
 // is the largest key that occurs in the file, and value() is an
 // 16-byte value containing the file number and file size, both
 // encoded using EncodeFixed64.
+
+/* ZcNote::一个内部实现的迭代器，根据一个输入的file组成的数组
+           进行初始化，key就是对应一个file的最大的key值，value就是file
+           的number和size的组合buf*/
+           
 class Version::LevelFileNumIterator : public Iterator {
  public:
   LevelFileNumIterator(const InternalKeyComparator& icmp,
@@ -1269,6 +1274,10 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
   // Level-0 files have to be merged together.  For other levels,
   // we will make a concatenating iterator per level.
   // TODO(opt): use concatenating iterator for level-0 if there is no overlap
+
+  /* ZcNote:: 如果是level0，c->inputs_[0]代表level0中input的file的个数，因为
+             level0有重叠，因此level0本身就需要file个iterator，其他的需要一个
+             如果不是level0，就一个level需要一个，也就是两个 */
   const int space = (c->level() == 0 ? c->inputs_[0].size() + 1 : 2);
   Iterator** list = new Iterator*[space];
   int num = 0;
@@ -1352,29 +1361,40 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
   const int level = c->level();
   InternalKey smallest, largest;
   GetRange(c->inputs_[0], &smallest, &largest);
-
+  /*ZcNote::1-先从level+1中找到与input[0]中重合的部分*/
   current_->GetOverlappingInputs(level+1, &smallest, &largest, &c->inputs_[1]);
 
   // Get entire range covered by compaction
   InternalKey all_start, all_limit;
+  
+  /*ZcNote::2-重新根据input[0]input[1]计算得到最小最大值*/
   GetRange2(c->inputs_[0], c->inputs_[1], &all_start, &all_limit);
 
   // See if we can grow the number of inputs in "level" without
   // changing the number of "level+1" files we pick up.
   if (!c->inputs_[1].empty()) {
     std::vector<FileMetaData*> expanded0;
+    /* ZcNote:: 3-根据新得到的最小最大值，再回到level中找到新的所有file*/
     current_->GetOverlappingInputs(level, &all_start, &all_limit, &expanded0);
     const int64_t inputs0_size = TotalFileSize(c->inputs_[0]);
     const int64_t inputs1_size = TotalFileSize(c->inputs_[1]);
     const int64_t expanded0_size = TotalFileSize(expanded0);
+    /* ZcNote:: 4-如果发现在level中确实有新增文件，并且level中总的文件个数不超过限制
+	            从level的所有file中，再重新找到level中的最小最大值*/
     if (expanded0.size() > c->inputs_[0].size() &&
         inputs1_size + expanded0_size <
             ExpandedCompactionByteSizeLimit(options_)) {
       InternalKey new_start, new_limit;
       GetRange(expanded0, &new_start, &new_limit);
       std::vector<FileMetaData*> expanded1;
+      /* ZcNote:: 5-再用level中新的最小最大值，再去level+1中找重叠的 */
       current_->GetOverlappingInputs(level+1, &new_start, &new_limit,
                                      &expanded1);
+      /* ZcNote::为何有这个if，因为如果刚好数组相等了，就说明第二次在
+	  level中扩张的file，并没有影响到level+1,也就是说再计算一次最小最大值，
+	  即使拿着新的最小最大值再去level中找一遍，也不会引入新的file了，反之
+	  如果不相等，就有可能在level中引入新的file，那么将是一个无限循环的过程
+	  失去意义了。*/
       if (expanded1.size() == c->inputs_[1].size()) {
         Log(options_->info_log,
             "Expanding@%d %d+%d (%ld+%ld bytes) to %d+%d (%ld+%ld bytes)\n",
@@ -1423,6 +1443,8 @@ Compaction* VersionSet::CompactRange(
   // But we cannot do this for level-0 since level-0 files can overlap
   // and we must not pick one file and drop another older file if the
   // two files overlap.
+  /* ZcNote:: 除了level0之外，别的level在压缩的时候，input的数量都是
+  要有限制的。不能太多。之所以level0特殊处理，是因为有重叠 */
   if (level > 0) {
     const uint64_t limit = MaxFileSizeForLevel(options_, level);
     uint64_t total = 0;
@@ -1435,7 +1457,11 @@ Compaction* VersionSet::CompactRange(
       }
     }
   }
-
+  /* ZcNote:: 由此可见，压缩的类主要是由这么几个参数构成:
+              1、哪个level
+              2、哪些ssttable(还要根据limit限制每次输入的table个数)
+              3、属于哪个version(这个还不理解为何需要)
+  */
   Compaction* c = new Compaction(options_, level);
   c->input_version_ = current_;
   c->input_version_->Ref();

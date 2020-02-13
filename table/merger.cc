@@ -47,7 +47,9 @@ class MergingIterator : public Iterator {
     FindLargest();
     direction_ = kReverse;
   }
-
+  /*ZcNote:: key就是target，然后遍历所有的迭代器，找出最小
+             的value，然后将_current更改为相应的迭代器，利用
+             那个迭代器的_current->value值获取value*/
   virtual void Seek(const Slice& target) {
     for (int i = 0; i < n_; i++) {
       children_[i].Seek(target);

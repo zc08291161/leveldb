@@ -163,7 +163,9 @@ bool SomeFileOverlapsRange(
 
 /* ZcNote::一个内部实现的迭代器，根据一个输入的file组成的数组
            进行初始化，key就是对应一个file的最大的key值，value就是file
-           的number和size的组合buf*/
+           的number和size的组合buf,这个迭代器的作用，就是给定一个key，
+           能够快速定位到在这个level中哪个file中。因为利用这个迭代器
+           的level肯定没有key的重叠 */
            
 class Version::LevelFileNumIterator : public Iterator {
  public:
@@ -228,7 +230,8 @@ static Iterator* GetFileIterator(void* arg,
                               DecodeFixed64(file_value.data() + 8));
   }
 }
-
+/* ZcNote::这个迭代器和MakeInputIterator的区别就是，前者是整个level的迭代器
+           而后者只是compaction的所有input文件的迭代器*/
 Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
                                             int level) const {
   return NewTwoLevelIterator(
@@ -1291,12 +1294,18 @@ Iterator* VersionSet::MakeInputIterator(Compaction* c) {
         }
       } else {
         // Create concatenating iterator for the files from this level
+        /* ZcNote:: 这个二级迭代器，就是从一个level中先找到一个file，然后再用
+		           file对应的ssttable自己的迭代器*/
         list[num++] = NewTwoLevelIterator(
             new Version::LevelFileNumIterator(icmp_, &c->inputs_[which]),
             &GetFileIterator, table_cache_, options);
       }
     }
   }
+  /* ZcNote::这个list相当于是的一个迭代器的集合，如果是从level0开始compaction
+             那么每个file都需要自己的迭代器，如果不是从level0，
+             就一个level一个迭代器*/
+             
   assert(num <= space);
   Iterator* result = NewMergingIterator(&icmp_, list, num);
   delete[] list;

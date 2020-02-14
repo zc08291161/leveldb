@@ -46,7 +46,7 @@ std::string InternalKey::DebugString() const {
 const char* InternalKeyComparator::Name() const {
   return "leveldb.InternalKeyComparator";
 }
-
+/* ZcNote::真正比较key大小的函数，先根据userkey值，再比较sequencenum，无需比较type*/
 int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   // Order by:
   //    increasing user key (according to user-supplied comparator)

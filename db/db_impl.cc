@@ -815,7 +815,8 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   }
   return s;
 }
-
+/* ZcNote::每当compaction到达一定大小之后，都会下盘一个新的file,这个函数
+           就是下盘新的file，并把compact->builder置空的*/
 Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
                                           Iterator* input) {
   assert(compact != NULL);
@@ -868,7 +869,8 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   return s;
 }
 
-
+/* ZcNote::这个地方把compaction产生的新文件放置到version
+           中，压缩真正完成 */
 Status DBImpl::InstallCompactionResults(CompactionState* compact) {
   mutex_.AssertHeld();
   Log(options_.info_log,  "Compacted %d@%d + %d@%d files => %lld bytes",
@@ -948,7 +950,11 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       current_user_key.clear();
       has_current_user_key = false;
       last_sequence_for_key = kMaxSequenceNumber;
-    } else {
+    } 
+    /* ZcNote::为何要设定这个current_user_key?因为在众多重叠的file文件中，非常有可能
+	         出现两个相同的key值。因为遍历的时候是从很多排序file中再去遍历的。并不是一个
+	         拍好序的file。就算是一个拍好序的file，也会存在连续的两个相同的key值。*/
+	else {
       if (!has_current_user_key ||
           user_comparator()->Compare(ikey.user_key,
                                      Slice(current_user_key)) != 0) {
@@ -963,6 +969,9 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         drop = true;    // (A)
       } else if (ikey.type == kTypeDeletion &&
                  ikey.sequence <= compact->smallest_snapshot &&
+                 /* ZcNote::为何更高层没有才能删除?因为如果更高层有，
+                 那么需要这个delete标志来确定这个key真的被删除了。以避免
+                 真的删除的key从更高层再找回来 */
                  compact->compaction->IsBaseLevelForKey(ikey.user_key)) {
         // For this user key:
         // (1) there is no data in higher levels
@@ -1032,6 +1041,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       stats.bytes_read += compact->compaction->input(which, i)->file_size;
     }
   }
+  /* ZcNote:: compact->outputs[i].file_size在FinishCompactionOutputFile中赋值*/
   for (size_t i = 0; i < compact->outputs.size(); i++) {
     stats.bytes_written += compact->outputs[i].file_size;
   }

@@ -82,7 +82,7 @@ Status WriteBatch::Iterate(Handler* handler) const {
     return Status::OK();
   }
 }
-
+/* ZcNote:: rep_是一个string类型，_rep.data()返回一个字符串数组的首地址 */
 int WriteBatchInternal::Count(const WriteBatch* b) {
   return DecodeFixed32(b->rep_.data() + 8);
 }
@@ -94,7 +94,9 @@ void WriteBatchInternal::SetCount(WriteBatch* b, int n) {
 SequenceNumber WriteBatchInternal::Sequence(const WriteBatch* b) {
   return SequenceNumber(DecodeFixed64(b->rep_.data()));
 }
-
+/* rep_的前八个字节放sequence, 然后四个字节放 count 
+   rep_
+   --Sequence(8B)--Count(4B)--*/
 void WriteBatchInternal::SetSequence(WriteBatch* b, SequenceNumber seq) {
   EncodeFixed64(&b->rep_[0], seq);
 }

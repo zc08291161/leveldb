@@ -613,6 +613,7 @@ std::string Version::DebugString() const {
 class VersionSet::Builder {
  private:
   // Helper to sort by v->files_[file_number].smallest
+  /* ZcNote::先用compare函数比较key的大小，如果key相同，再比较filenum的大小*/
   struct BySmallestKey {
     const InternalKeyComparator* internal_comparator;
 
@@ -826,15 +827,20 @@ void VersionSet::AppendVersion(Version* v) {
   v->prev_->next_ = v;
   v->next_->prev_ = v;
 }
-
+	
+/*ZcNote:: LogAndApply 函数中apply之后立即saveto。
+           经典之处不在这个函数而是在recover函数，多次apply之后一次save。
+           所以LogAndApply函数只是借用了apply，然后立即saveto使这个version生效*/
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   if (edit->has_log_number_) {
     assert(edit->log_number_ >= log_number_);
     assert(edit->log_number_ < next_file_number_);
   } else {
-    edit->SetLogNumber(log_number_);
+	/* ZcNote:: 这是用version里面的number填充edit*/
+	edit->SetLogNumber(log_number_);
   }
-
+  
+  /* ZcNote:: 这是用version里面的number填充edit*/
   if (!edit->has_prev_log_number_) {
     edit->SetPrevLogNumber(prev_log_number_);
   }

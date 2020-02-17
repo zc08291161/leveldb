@@ -881,8 +881,11 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
       static_cast<long long>(compact->total_bytes));
 
   // Add compaction outputs
+  /* ZcNote::将删除的file放入edit类中的delete结构体*/
   compact->compaction->AddInputDeletions(compact->compaction->edit());
   const int level = compact->compaction->level();
+  /* ZcNote::将新生成的file放入edit类中的add结构体,注意，这里看到了，都是level+1说明都是
+             生成在下一级level中 */
   for (size_t i = 0; i < compact->outputs.size(); i++) {
     const CompactionState::Output& out = compact->outputs[i];
     compact->compaction->edit()->AddFile(

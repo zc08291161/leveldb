@@ -627,7 +627,8 @@ class VersionSet::Builder {
       }
     }
   };
-
+  /* ZcNote::ÕâÊÇset³õÊ¼»¯µÄÒ»ÖÖ·½Ê½£¬×Ô¼º¶¨ÒåÀàĞÍµÄ±È½Ï·½Ê½£¬¶øÇÒ±ØĞëÊÇÒ»¸ö
+             structÀàĞÍ£¬ÖØÔØ()ÎªºÎaddfilesĞèÒª±È½Ïº¯Êı?ÒòÎªaddfilesĞèÒªÅÅĞò */
   typedef std::set<FileMetaData*, BySmallestKey> FileSet;
   struct LevelState {
     std::set<uint64_t> deleted_files;
@@ -688,6 +689,10 @@ class VersionSet::Builder {
          ++iter) {
       const int level = iter->first;
       const uint64_t number = iter->second;
+	  /*ZcNote:: _levelÊÇ¸öLevelStateÀà£¬ÀïÃæ·ÅµÄÊÇaddºÍdeletefile
+	             ÊÇ×÷ÎªÕâ¸öbuilderÀà×Ô¼ºµÄË½ÓĞÊı¾İ£¬applyÆğÊ¼¾ÍÊÇ
+	             °ÑeditÀïÃæµÄÊı¾İ¿½±´½øÁËbuilderÀàµÄË½ÓĞÊı¾İÖĞ¡£¶à´Î
+	             apply¾ÍÊÇºÏ²¢´¦Àí */
       levels_[level].deleted_files.insert(number);
     }
 
@@ -712,7 +717,8 @@ class VersionSet::Builder {
       // of data before triggering a compaction.
       f->allowed_seeks = (f->file_size / 16384);
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
-
+      /* ZcNote::Õâ¾ä»°ÓĞÃ»ÓĞ±ØÒªÄØå Ê²Ã´Ê±ºò»áÓĞÒ»¸ö¼´½«²åÈëµÄfileÔÚdeleteÁĞ±íÖĞ?¼´½«²åÈëµÄfile
+	             ²»¶¼ÊÇĞÂÉú³ÉµÄÃ´?*/
       levels_[level].deleted_files.erase(f->number);
       levels_[level].added_files->insert(f);
     }
@@ -725,15 +731,29 @@ class VersionSet::Builder {
     for (int level = 0; level < config::kNumLevels; level++) {
       // Merge the set of added files with the set of pre-existing files.
       // Drop any deleted files.  Store the result in *v.
+      /*ZcNote:: Õâ¸öbase_ÊÇbuildÀàÀïÃæµÄ£¬²¢²»ÊÇÍâÃæµÄÀà´ø½øÀ´µÄ£¬¾ÍÊÇ_current
+	             Õâ¸översion*/
       const std::vector<FileMetaData*>& base_files = base_->files_[level];
       std::vector<FileMetaData*>::const_iterator base_iter = base_files.begin();
       std::vector<FileMetaData*>::const_iterator base_end = base_files.end();
       const FileSet* added = levels_[level].added_files;
+	 /* ZcNote::ÕâÀïµÄfiles_¶¼ÊÇ³õÊ¼»¯µÄÒ»¸ö¿ÕµÄ£¬reserveÊÇ·ÖÅä³öÕâÃ´¶à¿Õ¼ä*/
       v->files_[level].reserve(base_files.size() + added->size());
       for (FileSet::const_iterator added_iter = added->begin();
            added_iter != added->end();
            ++added_iter) {
         // Add all smaller files listed in base_
+        /* ZcNote:: 1¡¢upper_bound ÔÚbeginºÍendÖ®¼äÀûÓÃcmpµÄ·½·¨
+		           ÕÒµ½µÚÒ»¸ö´óÓÚ*added_iterµÄÔªËØ£¬Òò´ËÕÒµ½µÄµÚÒ»¸öÔªËØÖ®Ç°£¬¶¼ÊÇ
+		           fileÀïÃæ×î´óµÄkey¶¼Ğ¡ÓÚÕâ¸ö*added_iterµÄ×îĞ¡µÄkeyµÄ¡£
+		           2¡¢ÄÇÃ´ÏÈÌí¼ÓbaseµÄ£¬È»ºóÌí¼ÓaddedµÄ£¬È»ºóÔÙÌí¼ÓÊ£ÓàbaseµÄ
+		           ²»µ£ĞÄaddedÀïÃæÓĞ±ÈbaseÊ£Óà²¿·Ö´óµÄÃ´? Õâ¸ö¾ÍÊÇ±È½ÏÄÑ¶®µÄµØ·½ÁË
+		           ÒòÎª£¬ÔÚÑ¹ËõµÄÊ±ºò£¬ÊÇ½«levelºÍÒªÑ¹Ëõµ½µÄlevel+1µÄËùÓĞfile½øĞĞÁË±È½Ï
+		           µÄ£¬Èç¹ûÓĞÖØµş£¬¾Í»áÒ»Æğ½øĞĞÑ¹Ëõ¡£Òò´Ë£¬addedÕâĞ©fileÖĞ£¬ÊÇ¿Ï¶¨²»»á
+		           ·¢ÉúºÍbaseÖĞÖØµşµÄ²¿·ÖµÄ¡£Èç¹ûlevel+1ÖĞÃ»ÓĞºÍlevelÖØµşµÄ£¬ÄÇÃ´addedÀïÃæ
+		           µÄfileÒ²¾ÍÒ»¶¨²»»á´óÓÚbaseÖĞÊ£ÓàµÄ²¿·Ö£¬ÒòÎªÒ»¿ªÊ¼¾ÍÃ»ÓĞÖØµş
+		           3¡¢Ô­À´baseÖĞµÄfileÊ²Ã´Ê±ºòÉ¾³ı?¾ÍÔÚMaybeAddFileÖĞÉ¾³ı£¬µ±ÔÚdeletefilesÖĞ
+		           µÄÊ±ºò¾Í²»Ìí¼Ó£¬Ò²¾Í×ÔÈ»É¾³ıÁË */
         for (std::vector<FileMetaData*>::const_iterator bpos
                  = std::upper_bound(base_iter, base_end, *added_iter, cmp);
              base_iter != bpos;
@@ -766,7 +786,9 @@ class VersionSet::Builder {
 #endif
     }
   }
-
+  
+/* ZcNote::Èç¹ûÔÚdeleteÎÄ¼şÖĞ£¬ÄÇ¾ÍÊ²Ã´¶¼²»×ö£¬·ñÔòÌí¼Óµ½vectorµÄ×îºóÃæ¡£ÒòÎª
+   Õâ¸övectorÊÇĞÂnew³öÀ´µÄÒ»¸ö£¬Ïàµ±ÓÚÁ½¸öÅÅĞòÁ´±í½øĞĞÔÙÅÅĞò */
   void MaybeAddFile(Version* v, int level, FileMetaData* f) {
     if (levels_[level].deleted_files.count(f->number) > 0) {
       // File is deleted: do nothing
@@ -1512,7 +1534,7 @@ bool Compaction::IsTrivialMove() const {
           TotalFileSize(grandparents_) <=
               MaxGrandParentOverlapBytes(vset->options_));
 }
-
+/* ZcNote::ĞèÒªdeleteµÄfile¾ÍÊÇinputsµÄÁ½¸öÊı×é£¬Ò²¾ÍÊÇÁ½¸ölevelÖĞÑ¡³öÀ´µÄÖØµş²¿·ÖµÄËùÓĞfile */
 void Compaction::AddInputDeletions(VersionEdit* edit) {
   for (int which = 0; which < 2; which++) {
     for (size_t i = 0; i < inputs_[which].size(); i++) {

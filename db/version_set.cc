@@ -886,6 +886,8 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
     // No reason to unlock *mu here since we only hit this path in the
     // first call to LogAndApply (when opening the database).
     assert(descriptor_file_ == NULL);
+	
+    /* ZcNote::new_manifest_file是个name */
     new_manifest_file = DescriptorFileName(dbname_, manifest_file_number_);
     edit->SetNextFile(next_file_number_);
     s = env_->NewWritableFile(new_manifest_file, &descriptor_file_);
@@ -1141,6 +1143,12 @@ void VersionSet::Finalize(Version* v) {
   v->compaction_score_ = best_score;
 }
 
+/*ZcNote::大部分的作用，是在这个manifest文件(可以理解为一个log文件，
+          就是添加record的那种)中写入一条log，log的内容是添加现在这个version的所有文件
+          什么意思呢?恢复的时候是要从一个空的version，通过一条一条的读取manifest文件
+          中的log，来达到恢复version的作用。因此这第一条log，就可以认为是，从0开始，对version
+          做了一次变化，变化就是添加了一些文件。也就是现在_current里面的这些文件 */
+          
 Status VersionSet::WriteSnapshot(log::Writer* log) {
   // TODO: Break up into multiple records to reduce memory usage on recovery?
 
@@ -1462,6 +1470,12 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
   // We update this immediately instead of waiting for the VersionEdit
   // to be applied so that if the compaction fails, we will try a different
   // key range next time.
+  
+  /* ZcNote::看起来这个ComPactPointer像是记录下一次压缩时候的最小值，file
+             中只要有大于这个值的，也就是max>这个的(见1369行)，那么就从第一个
+             满足这种情况的file开始，但是有个问题，那就是岂不是压缩的时候只能
+             单向了，也就是参与compaction的file的key只能越来越大么?这里是个
+             疑问，现在看来，至少fileaccess 这个机制可以打破这种单向 */
   compact_pointer_[level] = largest.Encode().ToString();
   c->edit_.SetCompactPointer(level, largest);
 }

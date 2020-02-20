@@ -140,7 +140,11 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
   // Reserve ten files or so for other uses and give the rest to TableCache.
   const int table_cache_size = options_.max_open_files - kNumNonTableCacheFiles;
   table_cache_ = new TableCache(dbname_, &options_, table_cache_size);
-
+  /*ZcNote:: table_cache是在这里初始化的，放入了versionset中，因为
+             真正用到这个cache的是versionset里面的get函数
+             整体来看，versionset更像是操作version的一个工具类一样
+             里面有version的链表，还有为了版本的实现做的各种操作 */
+             
   versions_ = new VersionSet(dbname_, &options_, table_cache_,
                              &internal_comparator_);
 }
@@ -1142,6 +1146,11 @@ Status DBImpl::Get(const ReadOptions& options,
   Version* current = versions_->current();
   mem->Ref();
   if (imm != NULL) imm->Ref();
+  /* ZcNote::这里进行了ref，读取完成之后unref 
+             其实在这里，current就是个指针，里面获取以后会有东西，但是
+             如果遇到compaction，它也只是链表上的一个过客而已。如果在get
+             的过程中发生了compaction，这个指针其实指向的这个version已经
+             不是_current了。所以1146行才用了一个指针，而不是用_current。*/
   current->Ref();
 
   bool have_stat_update = false;

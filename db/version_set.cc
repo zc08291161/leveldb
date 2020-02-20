@@ -717,7 +717,7 @@ class VersionSet::Builder {
       // of data before triggering a compaction.
       f->allowed_seeks = (f->file_size / 16384);
       if (f->allowed_seeks < 100) f->allowed_seeks = 100;
-      /* ZcNote::Õâ¾ä»°ÓĞÃ»ÓĞ±ØÒªÄØå Ê²Ã´Ê±ºò»áÓĞÒ»¸ö¼´½«²åÈëµÄfileÔÚdeleteÁĞ±íÖĞ?¼´½«²åÈëµÄfile
+      /* ZcNote::Õâ¾ä»°ÓĞÃ»ÓĞ±ØÒªÄØ? Ê²Ã´Ê±ºò»áÓĞÒ»¸ö¼´½«²åÈëµÄfileÔÚdeleteÁĞ±íÖĞ?¼´½«²åÈëµÄfile
 	             ²»¶¼ÊÇĞÂÉú³ÉµÄÃ´?*/
       levels_[level].deleted_files.erase(f->number);
       levels_[level].added_files->insert(f);
@@ -824,6 +824,15 @@ VersionSet::VersionSet(const std::string& dbname,
       dummy_versions_(this),
       current_(NULL) {
   AppendVersion(new Version(this));
+  
+  /* ZcNote:: ´ÓÕâÀï¿ÉÒÔ¿´³ö£º
+              1¡¢ÏÈÓĞversionset£¬ºóÓĞversion£¬versionÊÇÓÃ
+              versionset³õÊ¼»¯µÄ¡£¶øÇÒÒ»¿ªÊ¼versionÖĞÊÇÊ²Ã´¶¼Ã»ÓĞµÄ£¬Òò´Ë
+              ¿ÉÒÔ»ù±¾¶Ï¶¨£¬versionÀïÃæµÄÄÚÈİ¶¼ÊÇÓÉversionset»Ö¸´³öÀ´µÄ 
+              2¡¢versionsetÔÚ³õÊ¼»¯µÄÊ±ºò£¬Ò²¾ÍÊÇ¸ÕÆô¶¯µÄÊ±ºò£¬¶¼ÊÇÒ»¸ö
+              ¿ÕµÄversionÁ´±í£¬½«currentÌî½øÈ¥¡£ËùÒÔ£¬current¾ÍÊÇÕâ¸öÁ´±í
+              ÉÏ×îºóµÄÒ»¸översionÔªËØ */
+              
 }
 
 VersionSet::~VersionSet() {
@@ -838,12 +847,18 @@ void VersionSet::AppendVersion(Version* v) {
   assert(v->refs_ == 0);
   assert(v != current_);
   if (current_ != NULL) {
-    current_->Unref();
+    /* ZcNote:: leveldbÖĞËùÓĞµÄÉ¾³ı¶¼ÊÇÖ±½Ódelete£¬É¾³ı¸¸ÀàµÄ
+                Í¬Ê±°Ñ°üº¬ÀàµÄÄÚ´æÒ²ÊÍ·Åµô£¬Õâ¸öÂß¼­ÔÚUnrefÖĞ */
+	current_->Unref();
   }
   current_ = v;
   v->Ref();
 
   // Append to linked list
+  /* ZcNote::²åÈëË«ÏòÁ´±í¶ÓÎ² 
+	  <-dummy-> <-version->
+      <-dummy-> <-version-> <-version1->
+  */
   v->prev_ = dummy_versions_.prev_;
   v->next_ = &dummy_versions_;
   v->prev_->next_ = v;
@@ -852,7 +867,7 @@ void VersionSet::AppendVersion(Version* v) {
 	
 /*ZcNote:: LogAndApply º¯ÊıÖĞapplyÖ®ºóÁ¢¼´saveto¡£
            ¾­µäÖ®´¦²»ÔÚÕâ¸öº¯Êı¶øÊÇÔÚrecoverº¯Êı£¬¶à´ÎapplyÖ®ºóÒ»´Îsave¡£
-           ËùÒÔLogAndApplyº¯ÊıÖ»ÊÇ½èÓÃÁËapply£¬È»ºóÁ¢¼´savetoÊ¹Õâ¸översionÉúĞ§*/
+           ËùÒÔLogAndApplyº¯ÊıÖ»ÊÇ½èÓÃÁËapply£¬È»ºóÁ¢¼´savetoÊ¹Õâ¸översionÉúĞ§ */
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   if (edit->has_log_number_) {
     assert(edit->log_number_ >= log_number_);

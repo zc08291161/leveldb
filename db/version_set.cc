@@ -358,12 +358,15 @@ Status Version::Get(const ReadOptions& options,
   // in an smaller level, later levels are irrelevant.
   std::vector<FileMetaData*> tmp;
   FileMetaData* tmp2;
+  
   for (int level = 0; level < config::kNumLevels; level++) {
     size_t num_files = files_[level].size();
     if (num_files == 0) continue;
 
     // Get the list of files to search in this level
     FileMetaData* const* files = &files_[level][0];
+	
+	/* ZcNote:: level0的所有重叠的file文件 */
     if (level == 0) {
       // Level-0 files may overlap each other.  Find all files that
       // overlap user_key and process them in order from newest to oldest.
@@ -382,6 +385,9 @@ Status Version::Get(const ReadOptions& options,
       num_files = tmp.size();
     } else {
       // Binary search to find earliest index whose largest key >= ikey.
+      
+      /*ZcNote:: 正如上面注释，因为找到的是第一个最大的key比这个传入的key大的file，因此
+	             并不一定这个file的最小的key小于这个传入的key，因此后面才有if的判断 */
       uint32_t index = FindFile(vset_->icmp_, files_[level], ikey);
       if (index >= num_files) {
         files = NULL;
@@ -400,7 +406,12 @@ Status Version::Get(const ReadOptions& options,
     }
 
     for (uint32_t i = 0; i < num_files; ++i) {
-      if (last_file_read != NULL && stats->seek_file == NULL) {
+     /* ZcNote:: 这个下面的分支，只有当num_files的个数大于0
+	             的时候才会进入，记录了第一个file，也就是说只有
+	             level0的时候才会进入。然后记录下来一系列和key重叠的
+	             file里面number最小的那个 */
+	             
+	  if (last_file_read != NULL && stats->seek_file == NULL) {
         // We have had more than one seek for this read.  Charge the 1st file.
         stats->seek_file = last_file_read;
         stats->seek_file_level = last_file_read_level;
@@ -437,7 +448,10 @@ Status Version::Get(const ReadOptions& options,
 
   return Status::NotFound(Slice());  // Use an empty error message for speed
 }
-
+/* ZcNote:: 这个函数在dbimp里面调用 见db_impl.cc 1177行
+			主要的目的就是说，这个file已经被get过一次了，如果再多被seek几次，
+			就说明这个file不够新了，虽然有重叠，但是每次都找不到，还不如放到
+			下一个level中。关键的是，这些file难道都是level0的么？ */
 bool Version::UpdateStats(const GetStats& stats) {
   FileMetaData* f = stats.seek_file;
   if (f != NULL) {

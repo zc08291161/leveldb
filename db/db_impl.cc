@@ -1171,10 +1171,18 @@ Status DBImpl::Get(const ReadOptions& options,
     }
     mutex_.Lock();
   }
-
+  /*ZcNote:: have_stat_update说明经过version的get函数；stats里面有
+             经过这次get之后compactfile的情况，主要是allowseek引发
+             的file_to_compact_ */
   if (have_stat_update && current->UpdateStats(stats)) {
     MaybeScheduleCompaction();
   }
+  /* ZcNote:: 这里曾经有个小疑问，为何_mem没有找到，找到之后不重新插进来？
+              其实memtable这个东西，基本算是一个只由写入产生的一个table，
+              leveldb有自己的cache模块，是插到那个里面。如果插到memtable中
+              会打算memtable和log的关系，因为log是在memtable写入之后删除
+              的，如果读上来的数据也放进来，那就违背了log的意图了。因为log
+              里面记录的都是写入和删除，是没有读取的。*/
   mem->Unref();
   if (imm != NULL) imm->Unref();
   current->Unref();

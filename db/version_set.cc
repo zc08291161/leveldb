@@ -970,7 +970,9 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
 
   return s;
 }
-
+/* ZcNote::这个函数是通过current的manifest文件制造出dbimp中的_current,
+           记住，versionset中并没有单独的名字叫version的元素，只有一个
+           dummy双向环形链表，还有一个_current的version */
 Status VersionSet::Recover(bool *save_manifest) {
   struct LogReporter : public log::Reader::Reporter {
     Status* status;

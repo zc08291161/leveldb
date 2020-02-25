@@ -218,7 +218,9 @@ void DBImpl::MaybeIgnoreError(Status* s) const {
     *s = Status::OK();
   }
 }
-
+/* ZcNote::删除一些已经过时的文件,这些文件是从db文件夹中读取出来的
+           然后将dummyversion中的所有version的所有文件都读取出来
+           再做比较*/
 void DBImpl::DeleteObsoleteFiles() {
   if (!bg_error_.ok()) {
     // After a background error, we don't know whether a new version may
@@ -438,7 +440,10 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
     if (last_seq > *max_sequence) {
       *max_sequence = last_seq;
     }
-
+    /*ZcNote::正是由于这个原因，也就是说，有可能在db掉电之前，只写了
+	          log，进入内存，还没下盘，因此在recover的过程中有可能造成
+	          下盘以及compaction的操作，因此才会删除obseletefile之后，
+	          进入一次maybecompaction */
     if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
       compactions++;
       *save_manifest = true;
@@ -657,7 +662,7 @@ void DBImpl::MaybeScheduleCompaction() {
   } 
 	/*ZcNote:: imm_== NULL说明暂时没有写入操作，也就没有makeroomforWrite
 	说明这条分支没有compaction需求；version_->needsCompaction不需要说明
-	get方面没有从version中获取之后file的相应次数下降为0的；实际上只有这两部分
+	get方面没有从version中获取之后file的相应的allowseek次数下降为0的；实际上只有这两部分
 	会引发compaction*/
 	else if (imm_ == NULL &&
              manual_compaction_ == NULL &&
@@ -1556,6 +1561,7 @@ Status DB::Open(const Options& options, const std::string& dbname,
   if (s.ok() && save_manifest) {
     edit.SetPrevLogNumber(0);  // No older logs needed after recovery.
     edit.SetLogNumber(impl->logfile_number_);
+  /*ZcNote::这个edit是在recover的时候记录的所有*/
     s = impl->versions_->LogAndApply(&edit, &impl->mutex_);
   }
   if (s.ok()) {

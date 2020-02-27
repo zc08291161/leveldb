@@ -461,6 +461,8 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
   delete file;
 
   // See if we should keep reusing the last log file.
+  /*ZcNote::恢复的log文件中，只有可能保存最后一个log，还要看是否经过压缩
+            及是否options中有重用设置 */
   if (status.ok() && options_.reuse_logs && last_log && compactions == 0) {
     assert(logfile_ == NULL);
     assert(log_ == NULL);
@@ -472,7 +474,8 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
       log_ = new log::Writer(logfile_, lfile_size);
       logfile_number_ = log_number;
       if (mem != NULL) {
-        mem_ = mem;
+        /*ZcNote::只有重用log时，mem_才被赋了值，其他分支mem都是局部变量，都是要下table的 */
+		mem_ = mem;
         mem = NULL;
       } else {
         // mem can be NULL if lognum exists but was empty.
@@ -650,7 +653,16 @@ void DBImpl::RecordBackgroundError(const Status& s) {
     bg_cv_.SignalAll();
   }
 }
-
+/*ZcNote::造成compaction的原因：
+          1、DbImpl->Get触发，由于没有获取到导致file的allowseek次数降低----读触发
+          2、MakeRoomForWrite 写操作导致产生_imm，需要通过compaction压缩到level0 ---写触发
+          3、DB::Open的时候，在open的时候，由于宕机之前有些文件没有来得及下盘，需要由
+          log恢复到内存中，这个过程有可能会产生一次压缩（在recover流程），而压缩本身就是
+          会引起压缩的，因此再调用一次。如果没有进行压缩，在没有重用log的情况下都会有一次
+          写盘操作，也算一次压缩。就算重用了log，没有任何压缩，那么open的时候触发一次压缩
+          之后就会有不断的后台压缩任务了。
+          4、MaybeScheduleCompaction本身就是个后台任务，经过异步调度之后来到
+          BackgroundCall，这个在做完一次compaction之后，都会再调度一次MaybeScheduleCompaction*/
 void DBImpl::MaybeScheduleCompaction() {
   mutex_.AssertHeld();
   if (bg_compaction_scheduled_) {

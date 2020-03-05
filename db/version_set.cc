@@ -1016,6 +1016,7 @@ Status VersionSet::Recover(bool *save_manifest) {
   {
     LogReporter reporter;
     reporter.status = &s;
+	/*ZcNote::这个file就是current文件 */
     log::Reader reader(file, &reporter, true/*checksum*/, 0/*initial_offset*/);
     Slice record;
     std::string scratch;
@@ -1505,8 +1506,8 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
   /* ZcNote::看起来这个ComPactPointer像是记录下一次压缩时候的最小值，file
              中只要有大于这个值的，也就是max>这个的(见1369行)，那么就从第一个
              满足这种情况的file开始，但是有个问题，那就是岂不是压缩的时候只能
-             单向了，也就是参与compaction的file的key只能越来越大么?这里是个
-             疑问，现在看来，至少fileaccess 这个机制可以打破这种单向 */
+             单向了，也就是参与compaction的file的key只能越来越大么?PickCompaction
+             的1406行解答了这个疑问 */
   compact_pointer_[level] = largest.Encode().ToString();
   c->edit_.SetCompactPointer(level, largest);
 }
